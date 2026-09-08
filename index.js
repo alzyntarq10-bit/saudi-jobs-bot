@@ -1,10 +1,75 @@
 const http = require("http");
 
 const PORT = process.env.PORT || 3000;
+const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+
+async function sendMessage(chatId, text) {
+  if (!TOKEN) return;
+
+  await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: text
+    })
+  });
+}
 
 const server = http.createServer((req, res) => {
-  res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
-  res.end("Saudi Jobs Bot is running!");
+  if (req.method === "GET") {
+    res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
+    res.end("Saudi Jobs Bot is running!");
+    return;
+  }
+
+  if (req.method === "POST" && req.url === "/webhook") {
+    let body = "";
+
+    req.on("data", chunk => {
+      body += chunk;
+    });
+
+    req.on("end", async () => {
+      try {
+        const update = JSON.parse(body);
+
+        if (update.message) {
+          const chatId = update.message.chat.id;
+          const text = update.message.text || "";
+
+          if (text === "/start") {
+            await sendMessage(
+              chatId,
+              "🇸🇦 أهلاً بك في بوت وظائف السعودية\n\nاكتب /jobs لعرض الوظائف."
+            );
+          } else if (text === "/jobs") {
+            await sendMessage(
+              chatId,
+              "💼 أحدث الوظائف في السعودية ستظهر هنا قريباً."
+            );
+          } else {
+            await sendMessage(
+              chatId,
+              "استخدم /start للبدء أو /jobs لعرض الوظائف."
+            );
+          }
+        }
+
+        res.writeHead(200);
+        res.end("OK");
+      } catch (error) {
+        console.error(error);
+        res.writeHead(200);
+        res.end("OK");
+      }
+    });
+
+    return;
+  }
+
+  res.writeHead(404);
+  res.end("Not Found");
 });
 
 server.listen(PORT, () => {
