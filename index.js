@@ -108,4 +108,3 @@ async function testJobPost() {
     "✅ سيتم نشر الوظائف الحكومية والخاصة هنا بعد تفعيل مصادر الوظائف."
   );
 }
-testJobPost().catch(console.error);
