@@ -78,12 +78,8 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
-if (CHANNEL_ID) {
-  sendMessage(
-    CHANNEL_ID,
-    "🇸🇦 تم ربط بوت وظائف السعودية بالقناة بنجاح ✅"
-  ).catch(console.error);
-}
+
+
 // مصادر الوظائف في السعودية
 const JOB_SOURCES = [
   {
