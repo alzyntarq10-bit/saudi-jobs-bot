@@ -147,3 +147,5 @@ function isJobPosted(job) {
 
   return postedJobs.posted.includes(jobId);
 }
+// تشغيل نشر الوظائف عند بدء البوت
+publishJobs().catch(console.error);
