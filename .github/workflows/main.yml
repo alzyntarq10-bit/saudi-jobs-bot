@@ -7,10 +7,10 @@ on:
   workflow_dispatch:
 
 jobs:
-  wake-bot:
+  publish-jobs:
     runs-on: ubuntu-latest
     steps:
-      - name: Wake Saudi Jobs Bot
+      - name: Trigger Saudi Jobs Publishing
         run: |
           curl --fail --retry 3 --max-time 120 \
-            https://saudi-jobs-bot.onrender.com/
+            https://saudi-jobs-bot.onrender.com/publish
