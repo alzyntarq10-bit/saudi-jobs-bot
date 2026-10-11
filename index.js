@@ -128,3 +128,7 @@ async function publishJobs() {
     }
   }
 }
+// إنشاء معرف ثابت لكل وظيفة
+function getJobId(job) {
+  return String(job.url || "").trim();
+}
