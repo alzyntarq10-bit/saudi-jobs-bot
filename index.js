@@ -1,172 +1,136 @@
+
 const http = require("http");
 const fs = require("fs");
+const path = require("path");
 const { formatJob } = require("./jobs");
-const jobsData = require("./jobs-data.json");
-const postedJobs = require("./posted-jobs.json");
-const PORT = process.env.PORT || 3000;
+
+const PORT = Number(process.env.PORT || 3000);
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CHANNEL_ID = process.env.CHANNEL_ID;
-async function sendMessage(chatId, text) {
-  if (!TOKEN) return;
+const SECRET = process.env.PUBLISH_SECRET;
 
-  await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text: text
-    })
-  });
+const DATA = path.join(__dirname, "jobs-data.json");
+const HISTORY = path.join(__dirname, "posted-jobs.json");
+
+let publishing = false;
+
+function readJSON(file, fallback) {
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf8"));
+  } catch (error) {
+    if (error.code === "ENOENT") return fallback;
+    throw error;
+  }
 }
 
-const server = http.createServer((req, res) => {
-  
-  if (req.method === "POST" && req.url === "/publish") {
-    const secret = process.env.PUBLISH_SECRET;
-    const provided = req.headers["x-publish-secret"];
+async function sendMessage(chatId, text) {
+  if (!TOKEN || !chatId) {
+    throw new Error("Missing Telegram configuration");
+  }
 
-    if (!secret || provided !== secret) {
-      res.writeHead(401);
-      res.end("Unauthorized");
-      return;
+  const response = await fetch(
+    `https://api.telegram.org/bot${TOKEN}/sendMessage`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: text
+      })
+    }
+  );
+
+  const result = await response.json();
+
+  if (!response.ok || !result.ok) {
+    throw new Error(
+      `Telegram error: ${result.description || response.status}`
+    );
+  }
+
+  return result;
+}
+
+async function publishJobs() {
+  if (publishing) {
+    throw new Error("Publishing already running");
+  }
+
+  publishing = true;
+
+  try {
+    const data = readJSON(DATA, { jobs: [] });
+    const history = readJSON(HISTORY, { posted: [] });
+
+    const posted = new Set(
+      Array.isArray(history.posted) ? history.posted : []
+    );
+
+    let sent = 0;
+
+    for (const job of data.jobs || []) {
+      const id = String(job.url || "").trim();
+
+      if (!id || posted.has(id)) continue;
+
+      const message = formatJob(job);
+
+      if (!message) continue;
+
+      await sendMessage(CHANNEL_ID, message);
+
+      posted.add(id);
+
+      fs.writeFileSync(
+        HISTORY,
+        JSON.stringify({ posted: [...posted] }, null, 2)
+      );
+
+      sent++;
     }
 
-    publishJobs()
-      .then(() => {
-        res.writeHead(200);
-        res.end("Publishing completed");
-      })
-      .catch(error => {
-        console.error(error);
-        res.writeHead(500);
-        res.end("Publishing failed");
-      });
-
-    return;
+    console.log(`Publishing complete. Sent: ${sent}`);
+    return sent;
+  } finally {
+    publishing = false;
   }
+}
 
-  if (req.method === "GET") {
-    res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
-    res.end("Saudi Jobs Bot is running!");
-    return;
-  }
-
-  if (req.method === "POST" && req.url === "/webhook") {
-    let body = "";
-
-    req.on("data", chunk => {
-      body += chunk;
+const server = http.createServer(async (req, res) => {
+  const reply = (code, message) => {
+    res.writeHead(code, {
+      "Content-Type": "text/plain; charset=utf-8"
     });
+    res.end(message);
+  };
 
-    req.on("end", async () => {
-      try {
-        const update = JSON.parse(body);
-
-        if (update.message) {
-          const chatId = update.message.chat.id;
-          const text = update.message.text || "";
-
-          if (text === "/start") {
-            await sendMessage(
-              chatId,
-              "🇸🇦 أهلاً بك في بوت وظائف السعودية\n\nاكتب /jobs لعرض الوظائف."
-            );
-          } else if (text === "/jobs") {
-            await sendMessage(
-              chatId,
-              "💼 أحدث الوظائف في السعودية ستظهر هنا قريباً."
-            );
-          } else {
-            await sendMessage(
-              chatId,
-              "استخدم /start للبدء أو /jobs لعرض الوظائف."
-            );
-          }
-        }
-
-        res.writeHead(200);
-        res.end("OK");
-      } catch (error) {
-        console.error(error);
-        res.writeHead(200);
-        res.end("OK");
-      }
-    });
-
-    return;
+  if (req.method === "GET" && req.url === "/") {
+    return reply(200, "Saudi Jobs Bot is running!");
   }
 
-  res.writeHead(404);
-  res.end("Not Found");
+  if (req.method === "POST" && req.url === "/publish") {
+    if (
+      !SECRET ||
+      req.headers["x-publish-secret"] !== SECRET
+    ) {
+      return reply(401, "Unauthorized");
+    }
+
+    try {
+      const count = await publishJobs();
+      return reply(
+        200,
+        `Publishing completed. Sent: ${count}`
+      );
+    } catch (error) {
+      console.error("Publish failed:", error);
+      return reply(500, "Publishing failed");
+    }
+  }
+
+  return reply(404, "Not found");
 });
 
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
-
-
-// مصادر الوظائف في السعودية
-const JOB_SOURCES = [
-  {
-    name: "جدارات - وظائف حكومية وخاصة",
-    url: "https://jadarat.sa"
-  },
-  {
-    name: "لينكدإن - وظائف الشركات",
-    url: "https://www.linkedin.com/jobs/"
-  }
-];
-
-// الفاصل الزمني: 3 ساعات
-const POST_INTERVAL = 3 * 60 * 60 * 1000;
-// اختبار إرسال رسالة إلى قناة الوظائف
-async function testJobPost() {
-  if (!TOKEN || !CHANNEL_ID) {
-    console.log("إعدادات البوت أو القناة غير مكتملة");
-    return;
-  }
-
-  await sendMessage(
-    CHANNEL_ID,
-    "🇸🇦 بوت وظائف السعودية جاهز!\n\n" +
-    "✅ سيتم نشر الوظائف الحكومية والخاصة هنا بعد تفعيل مصادر الوظائف."
-  );
-}
-// قراءة الوظائف وتجهيزها للنشر
-async function publishJobs() {
-  if (!CHANNEL_ID || !TOKEN) return;
-
-  const jobs = jobsData.jobs || [];
-
-  if (jobs.length === 0) {
-    console.log("لا توجد وظائف للنشر حاليًا");
-    return;
-  }
-
-  for (const job of jobs) {
-    const message = formatJob(job);
-
-    if (message && !isJobPosted(job)) {
-      await sendMessage(CHANNEL_ID, message);
-postedJobs.posted.push(getJobId(job));  
-      fs.writeFileSync(
-  "./posted-jobs.json",
-  JSON.stringify(postedJobs, null, 2)
-);
-    }
-  }
-}
-// إنشاء معرف ثابت لكل وظيفة
-function getJobId(job) {
-  return String(job.url || "").trim();
-}
-// التحقق من نشر الوظيفة سابقًا
-function isJobPosted(job) {
-  const jobId = getJobId(job);
-
-  if (!jobId) return true;
-
-  return postedJobs.posted.includes(jobId);
-}
-// تشغيل نشر الوظائف عند بدء البوت
-publishJobs().catch(console.error);
