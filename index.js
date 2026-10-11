@@ -95,3 +95,17 @@ const JOB_SOURCES = [
 
 // الفاصل الزمني: 3 ساعات
 const POST_INTERVAL = 3 * 60 * 60 * 1000;
+// اختبار إرسال رسالة إلى قناة الوظائف
+async function testJobPost() {
+  if (!TOKEN || !CHANNEL_ID) {
+    console.log("إعدادات البوت أو القناة غير مكتملة");
+    return;
+  }
+
+  await sendMessage(
+    CHANNEL_ID,
+    "🇸🇦 بوت وظائف السعودية جاهز!\n\n" +
+    "✅ سيتم نشر الوظائف الحكومية والخاصة هنا بعد تفعيل مصادر الوظائف."
+  );
+}
+testJobPost().catch(console.error);
