@@ -2,7 +2,7 @@ const http = require("http");
 
 const PORT = process.env.PORT || 3000;
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-
+const CHANNEL_ID = process.env.CHANNEL_ID;
 async function sendMessage(chatId, text) {
   if (!TOKEN) return;
 
