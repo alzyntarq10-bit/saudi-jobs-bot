@@ -1,6 +1,7 @@
 const http = require("http");
 const { formatJob } = require("./jobs");
 const jobsData = require("./jobs-data.json");
+const postedJobs = require("./posted-jobs.json");
 const PORT = process.env.PORT || 3000;
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CHANNEL_ID = process.env.CHANNEL_ID;
