@@ -109,3 +109,22 @@ async function testJobPost() {
     "✅ سيتم نشر الوظائف الحكومية والخاصة هنا بعد تفعيل مصادر الوظائف."
   );
 }
+// قراءة الوظائف وتجهيزها للنشر
+async function publishJobs() {
+  if (!CHANNEL_ID || !TOKEN) return;
+
+  const jobs = jobsData.jobs || [];
+
+  if (jobs.length === 0) {
+    console.log("لا توجد وظائف للنشر حاليًا");
+    return;
+  }
+
+  for (const job of jobs) {
+    const message = formatJob(job);
+
+    if (message) {
+      await sendMessage(CHANNEL_ID, message);
+    }
+  }
+}
