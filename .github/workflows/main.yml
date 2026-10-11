@@ -10,7 +10,11 @@ jobs:
   publish-jobs:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger Saudi Jobs Publishing
+      - name: Publish Saudi Jobs
+        env:
+          PUBLISH_SECRET: ${{ secrets.PUBLISH_SECRET }}
         run: |
-          curl --fail --retry 3 --max-time 120 \
+          curl --fail --show-error --retry 3 --max-time 120 \
+            -X POST \
+            -H "x-publish-secret: ${PUBLISH_SECRET}" \
             https://saudi-jobs-bot.onrender.com/publish
