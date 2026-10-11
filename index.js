@@ -1,4 +1,5 @@
 const http = require("http");
+const fs = require("fs");
 const { formatJob } = require("./jobs");
 const jobsData = require("./jobs-data.json");
 const postedJobs = require("./posted-jobs.json");
@@ -124,12 +125,25 @@ async function publishJobs() {
   for (const job of jobs) {
     const message = formatJob(job);
 
-    if (message) {
+    if (message && !isJobPosted(job)) {
       await sendMessage(CHANNEL_ID, message);
+postedJobs.posted.push(getJobId(job));  
+      fs.writeFileSync(
+  "./posted-jobs.json",
+  JSON.stringify(postedJobs, null, 2)
+);
     }
   }
 }
 // إنشاء معرف ثابت لكل وظيفة
 function getJobId(job) {
   return String(job.url || "").trim();
+}
+// التحقق من نشر الوظيفة سابقًا
+function isJobPosted(job) {
+  const jobId = getJobId(job);
+
+  if (!jobId) return true;
+
+  return postedJobs.posted.includes(jobId);
 }
