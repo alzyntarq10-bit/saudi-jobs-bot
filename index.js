@@ -20,6 +20,31 @@ async function sendMessage(chatId, text) {
 }
 
 const server = http.createServer((req, res) => {
+  
+  if (req.method === "POST" && req.url === "/publish") {
+    const secret = process.env.PUBLISH_SECRET;
+    const provided = req.headers["x-publish-secret"];
+
+    if (!secret || provided !== secret) {
+      res.writeHead(401);
+      res.end("Unauthorized");
+      return;
+    }
+
+    publishJobs()
+      .then(() => {
+        res.writeHead(200);
+        res.end("Publishing completed");
+      })
+      .catch(error => {
+        console.error(error);
+        res.writeHead(500);
+        res.end("Publishing failed");
+      });
+
+    return;
+  }
+
   if (req.method === "GET") {
     res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
     res.end("Saudi Jobs Bot is running!");
