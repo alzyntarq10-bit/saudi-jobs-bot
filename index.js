@@ -81,3 +81,17 @@ if (CHANNEL_ID) {
     "🇸🇦 تم ربط بوت وظائف السعودية بالقناة بنجاح ✅"
   ).catch(console.error);
 }
+// مصادر الوظائف في السعودية
+const JOB_SOURCES = [
+  {
+    name: "جدارات - وظائف حكومية وخاصة",
+    url: "https://jadarat.sa"
+  },
+  {
+    name: "لينكدإن - وظائف الشركات",
+    url: "https://www.linkedin.com/jobs/"
+  }
+];
+
+// الفاصل الزمني: 3 ساعات
+const POST_INTERVAL = 3 * 60 * 60 * 1000;
