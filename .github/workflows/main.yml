@@ -6,15 +6,108 @@ on:
     - cron: '0 */3 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
+concurrency:
+  group: saudi-jobs-publishing
+  cancel-in-progress: false
+
 jobs:
   publish-jobs:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Publish Saudi Jobs
+      - name: Download project
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Fetch job announcements
+        run: node fetch-jobs.js
+
+      - name: Publish to Telegram
         env:
-          PUBLISH_SECRET: ${{ secrets.PUBLISH_SECRET }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
         run: |
-          curl --fail --show-error --retry 3 --max-time 120 \
-            -X POST \
-            -H "x-publish-secret: ${PUBLISH_SECRET}" \
-            https://saudi-jobs-bot.onrender.com/publish
+          node - <<'NODE'
+          const fs = require('fs');
+          const { formatJob } = require('./jobs');
+
+          async function main() {
+            const jobs = JSON.parse(
+              fs.readFileSync('jobs-data.json', 'utf8')
+            ).jobs || [];
+
+            const file = 'posted-jobs.json';
+            const history = JSON.parse(
+              fs.readFileSync(file, 'utf8')
+            );
+
+            const posted = Array.isArray(history)
+              ? history
+              : (history.posted || []);
+
+            const seen = new Set(posted);
+            let sent = 0;
+
+            for (const job of jobs) {
+              if (!job.url || seen.has(job.url)) continue;
+
+              const message = formatJob(job);
+              if (!message) continue;
+
+              const response = await fetch(
+                'https://api.telegram.org/bot' +
+                process.env.TELEGRAM_BOT_TOKEN +
+                '/sendMessage',
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({
+                    chat_id: process.env.CHANNEL_ID,
+                    text: message
+                  })
+                }
+              );
+
+              const result = await response.json();
+
+              if (!result.ok) {
+                throw new Error(result.description);
+              }
+
+              posted.push(job.url);
+              seen.add(job.url);
+              sent++;
+
+              fs.writeFileSync(
+                file,
+                JSON.stringify({ posted }, null, 2)
+              );
+            }
+
+            console.log('Published:', sent);
+          }
+
+          main().catch(error => {
+            console.error(error);
+            process.exit(1);
+          });
+          NODE
+
+      - name: Save published jobs
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add jobs-data.json posted-jobs.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Update Saudi jobs data"
+            git push
+          fi
