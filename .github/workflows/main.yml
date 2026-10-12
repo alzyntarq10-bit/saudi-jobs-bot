@@ -16,6 +16,7 @@ concurrency:
 jobs:
   publish-jobs:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Download project
@@ -38,29 +39,13 @@ jobs:
           const fs = require('fs');
           const { formatJob } = require('./jobs');
 
-          async function main() {
-            const jobs = JSON.parse(
-              fs.readFileSync('jobs-data.json', 'utf8')
-            ).jobs || [];
+          const sleep = ms =>
+            new Promise(resolve => setTimeout(resolve, ms));
 
-            const file = 'posted-jobs.json';
-            const history = JSON.parse(
-              fs.readFileSync(file, 'utf8')
-            );
+          const file = 'posted-jobs.json';
 
-            const posted = Array.isArray(history)
-              ? history
-              : (history.posted || []);
-
-            const seen = new Set(posted);
-            let sent = 0;
-
-            for (const job of jobs) {
-              if (!job.url || seen.has(job.url)) continue;
-
-              const message = formatJob(job);
-              if (!message) continue;
-
+          async function sendTelegram(message) {
+            for (let attempt = 1; attempt <= 5; attempt++) {
               const response = await fetch(
                 'https://api.telegram.org/bot' +
                 process.env.TELEGRAM_BOT_TOKEN +
@@ -79,9 +64,58 @@ jobs:
 
               const result = await response.json();
 
-              if (!result.ok) {
-                throw new Error(result.description);
+              if (result.ok) return true;
+
+              if (result.error_code === 429) {
+                const seconds =
+                  result.parameters?.retry_after || 60;
+
+                console.log(
+                  `Telegram rate limit. Waiting ${seconds}s`
+                );
+
+                await sleep((seconds + 2) * 1000);
+                continue;
               }
+
+              throw new Error(
+                result.description || 'Telegram error'
+              );
+            }
+
+            throw new Error('Telegram retry limit reached');
+          }
+
+          async function main() {
+            if (
+              !process.env.TELEGRAM_BOT_TOKEN ||
+              !process.env.CHANNEL_ID
+            ) {
+              throw new Error('Missing Telegram secrets');
+            }
+
+            const jobs = JSON.parse(
+              fs.readFileSync('jobs-data.json', 'utf8')
+            ).jobs || [];
+
+            const history = JSON.parse(
+              fs.readFileSync(file, 'utf8')
+            );
+
+            const posted = Array.isArray(history)
+              ? history
+              : (history.posted || []);
+
+            const seen = new Set(posted);
+            let sent = 0;
+
+            for (const job of jobs) {
+              if (!job.url || seen.has(job.url)) continue;
+
+              const message = formatJob(job);
+              if (!message) continue;
+
+              await sendTelegram(message);
 
               posted.push(job.url);
               seen.add(job.url);
@@ -91,18 +125,23 @@ jobs:
                 file,
                 JSON.stringify({ posted }, null, 2)
               );
+
+              console.log(`Published job ${sent}`);
+
+              await sleep(5000);
             }
 
-            console.log('Published:', sent);
+            console.log('Total published:', sent);
           }
 
           main().catch(error => {
-            console.error(error);
-            process.exit(1);
+            console.error(error.message);
+            process.exitCode = 1;
           });
           NODE
 
       - name: Save published jobs
+        if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
