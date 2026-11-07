@@ -21,6 +21,9 @@ jobs:
     steps:
       - name: Download project
         uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -39,6 +42,9 @@ jobs:
           const fs = require('fs');
           const { formatJob } = require('./jobs');
 
+          const sleep = ms =>
+            new Promise(resolve => setTimeout(resolve, ms));
+
           async function main() {
             const token = process.env.TELEGRAM_BOT_TOKEN;
             const channel = process.env.CHANNEL_ID;
@@ -50,26 +56,33 @@ jobs:
             const data = JSON.parse(
               fs.readFileSync('jobs-data.json', 'utf8')
             );
+
             const history = JSON.parse(
               fs.readFileSync('posted-jobs.json', 'utf8')
             );
 
             const posted = new Set(history.posted || []);
+            let count = 0;
 
             for (const job of data.jobs || []) {
               const message = formatJob(job);
               const id = String(job.url || '').trim();
 
-              if (!message || !id || posted.has(id)) continue;
+              if (!message || !id || posted.has(id)) {
+                continue;
+              }
 
               const response = await fetch(
                 `https://api.telegram.org/bot${token}/sendMessage`,
                 {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
+                  headers: {
+                    'Content-Type': 'application/json'
+                  },
                   body: JSON.stringify({
                     chat_id: channel,
-                    text: message
+                    text: message,
+                    disable_web_page_preview: true
                   })
                 }
               );
@@ -78,7 +91,7 @@ jobs:
 
               if (!response.ok || !result.ok) {
                 throw new Error(
-                  `Telegram publish failed: ${result.description}`
+                  `Telegram error: ${result.description}`
                 );
               }
 
@@ -90,8 +103,13 @@ jobs:
                 JSON.stringify(history, null, 2)
               );
 
-              await new Promise(resolve => setTimeout(resolve, 1500));
+              count++;
+              console.log(`Published job ${count}`);
+
+              await sleep(1500);
             }
+
+            console.log(`Total published: ${count}`);
           }
 
           main().catch(error => {
@@ -103,6 +121,8 @@ jobs:
       - name: Save published jobs
         if: always()
         run: |
+          set -e
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
@@ -116,19 +136,23 @@ jobs:
           git commit -m "Update Saudi jobs data"
 
           for attempt in 1 2 3 4 5; do
+            echo "Save attempt: $attempt"
+
             git fetch origin main
 
-            if git rebase origin/main; then
-              if git push origin HEAD:main; then
-                echo "Jobs history saved successfully"
-                exit 0
-              fi
-            else
+            if ! git rebase origin/main; then
+              echo "Rebase conflict detected"
               git rebase --abort || true
               exit 1
+            fi
+
+            if git push origin HEAD:main; then
+              echo "Jobs saved successfully"
+              exit 0
             fi
 
             sleep 5
           done
 
+          echo "Failed to save after 5 attempts"
           exit 1
