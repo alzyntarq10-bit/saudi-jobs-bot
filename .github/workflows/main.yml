@@ -1,4 +1,105 @@
 
+name: Saudi Jobs Scheduler
+
+on:
+  schedule:
+    - cron: '0 */3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: saudi-jobs-publishing
+  cancel-in-progress: false
+
+jobs:
+  publish-jobs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Download project
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Fetch Saudi jobs
+        run: node fetch-jobs.js
+
+      - name: Publish jobs to Telegram
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const { formatJob } = require('./jobs');
+
+          async function main() {
+            const token = process.env.TELEGRAM_BOT_TOKEN;
+            const channel = process.env.CHANNEL_ID;
+
+            if (!token || !channel) {
+              throw new Error('Missing Telegram secrets');
+            }
+
+            const data = JSON.parse(
+              fs.readFileSync('jobs-data.json', 'utf8')
+            );
+            const history = JSON.parse(
+              fs.readFileSync('posted-jobs.json', 'utf8')
+            );
+
+            const posted = new Set(history.posted || []);
+
+            for (const job of data.jobs || []) {
+              const message = formatJob(job);
+              const id = String(job.url || '').trim();
+
+              if (!message || !id || posted.has(id)) continue;
+
+              const response = await fetch(
+                `https://api.telegram.org/bot${token}/sendMessage`,
+                {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    chat_id: channel,
+                    text: message
+                  })
+                }
+              );
+
+              const result = await response.json();
+
+              if (!response.ok || !result.ok) {
+                throw new Error(
+                  `Telegram publish failed: ${result.description}`
+                );
+              }
+
+              posted.add(id);
+              history.posted = [...posted];
+
+              fs.writeFileSync(
+                'posted-jobs.json',
+                JSON.stringify(history, null, 2)
+              );
+
+              await new Promise(resolve => setTimeout(resolve, 1500));
+            }
+          }
+
+          main().catch(error => {
+            console.error(error);
+            process.exit(1);
+          });
+          NODE
+
       - name: Save published jobs
         if: always()
         run: |
@@ -23,14 +124,11 @@
                 exit 0
               fi
             else
-              echo "Rebase conflict detected"
               git rebase --abort || true
               exit 1
             fi
 
-            echo "Retrying push..."
             sleep 5
           done
 
-          echo "Failed to save jobs history"
           exit 1
