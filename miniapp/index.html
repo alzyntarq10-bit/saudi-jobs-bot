@@ -1,0 +1,107 @@
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>وظائف السعودية</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*{box-sizing:border-box}
+body{font-family:Tahoma,Arial,sans-serif;margin:0;background:#f3f6f5;color:#18352a}
+header{background:#08784e;color:white;padding:24px 16px;text-align:center}
+header h1{margin:0 0 8px;font-size:25px}
+main{max-width:650px;margin:auto;padding:15px}
+input,select{width:100%;padding:13px;margin:6px 0;border:1px solid #ddd;border-radius:10px;font-size:15px}
+.job{background:white;border-radius:13px;padding:16px;margin:12px 0;box-shadow:0 2px 8px #0001}
+.job h3{margin:0 0 10px}
+.job p{margin:7px 0;color:#52645c}
+.apply{display:block;background:#08784e;color:white;text-decoration:none;text-align:center;padding:12px;border-radius:9px;margin-top:12px}
+#status{text-align:center;padding:15px}
+</style>
+</head>
+<body>
+<header>
+<h1>🇸🇦 وظائف السعودية</h1>
+<p>أحدث الفرص الوظيفية الحكومية والخاصة</p>
+</header>
+<main>
+<input id="search" placeholder="🔍 ابحث عن وظيفة">
+<select id="sector">
+<option value="">جميع القطاعات</option>
+<option value="حكومي">حكومية</option>
+<option value="خاص">خاصة</option>
+</select>
+<input id="city" placeholder="المدينة: الرياض، جدة...">
+<div id="status">جاري تحميل الوظائف...</div>
+<div id="jobs"></div>
+</main>
+<script>
+const tg=window.Telegram?.WebApp;
+tg?.ready();
+tg?.expand();
+
+let jobs=[];
+const root="/saudi-jobs-bot/jobs-data.json";
+
+function safeUrl(url){
+ try{
+  const u=new URL(url);
+  return ["https:","http:"].includes(u.protocol)?u.href:null;
+ }catch{return null}
+}
+function render(){
+ const q=document.querySelector("#search").value.trim().toLowerCase();
+ const city=document.querySelector("#city").value.trim().toLowerCase();
+ const sector=document.querySelector("#sector").value;
+ const box=document.querySelector("#jobs");
+ box.replaceChildren();
+ const filtered=jobs.filter(j=>{
+  const text=[j.title,j.company,j.city].join(" ").toLowerCase();
+  const kind=String(j.sector||j.type||"");
+  return text.includes(q)&&String(j.city||"").toLowerCase().includes(city)&&(!sector||kind.includes(sector));
+ });
+ document.querySelector("#status").textContent=filtered.length?`${filtered.length} وظيفة متاحة`:"لا توجد وظائف مطابقة";
+ filtered.forEach(j=>{
+  const card=document.createElement("article");
+  card.className="job";
+  const title=document.createElement("h3");
+  title.textContent=j.title||"وظيفة جديدة";
+  card.append(title);
+  for(const value of [j.company,j.city]){
+   if(!value)continue;
+   const p=document.createElement("p");
+   p.textContent=value;
+   card.append(p);
+  }
+  const url=safeUrl(j.url);
+  if(url){
+   const a=document.createElement("a");
+   a.className="apply";
+   a.textContent="عرض الوظيفة والتقديم";
+   a.href=url;
+   a.target="_blank";
+   a.rel="noopener noreferrer";
+   card.append(a);
+  }
+  box.append(card);
+ });
+}
+async function load(){
+ try{
+  const response=await fetch(root+"?t="+Date.now());
+  if(!response.ok)throw Error("HTTP "+response.status);
+  const data=await response.json();
+  jobs=Array.isArray(data)?data:
+       Array.isArray(data.jobs)?data.jobs:[];
+  render();
+ }catch(e){
+  document.querySelector("#status").textContent="تعذر تحميل الوظائف. تحقق من ملف البيانات.";
+ }
+}
+["search","city"].forEach(id=>document.getElementById(id).addEventListener("input",render));
+document.getElementById("sector").addEventListener("change",render);
+load();
+</script>
+</body>
+</html>
