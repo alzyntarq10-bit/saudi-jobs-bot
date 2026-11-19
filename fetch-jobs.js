@@ -2,26 +2,44 @@
 const fs = require("fs");
 
 const QUERIES = [
-  '"وظائف شاغرة" "السعودية" when:7d',
-  '"وظائف شاغرة" "الرياض" when:7d',
+  '"وظائف" "التقديم" "السعودية" when:7d',
+  '"وظائف حكومية" "التقديم" when:7d',
+  '"وظائف شركات" "السعودية" when:7d',
+  '"فرص وظيفية" "الرياض" when:7d',
   '"وظائف شاغرة" "جدة" when:7d',
-  '"وظائف شاغرة" "الدمام" when:7d',
-  '"فرص وظيفية" "السعودية" when:7d',
+  '"وظائف" "الدمام" when:7d',
   '"فتح باب التوظيف" "السعودية" when:7d',
-  '"بدء التقديم" "وظائف" "السعودية" when:7d'
+  '"التقديم على وظائف" "السعودية" when:7d'
 ];
 
 const JOB_WORDS =
-  /وظائف شاغرة|وظائف متاحة|فرص وظيفية|فرص عمل|فتح باب التوظيف|بدء التقديم|يعلن عن وظائف|تعلن عن وظائف|طرح \d+ وظيفة|تطرح \d+ وظيفة|مطلوب موظفين|مطلوب للتوظيف/i;
+  /وظائف|وظيفة|توظيف|فرص وظيفية|فرص عمل|شواغر|مطلوب موظفين|فتح باب التقديم|فتح باب التوظيف/i;
+
+const ACTION_WORDS =
+  /التقديم|تقدم|التسجيل|فتح باب|تعلن|يعلن|مطلوب|شواغر|فرص|توظيف/i;
 
 const SAUDI_WORDS =
-  /السعودية|السعودي|السعودية|المملكة العربية السعودية|الرياض|جدة|مكة|المدينة المنورة|الدمام|الخبر|الظهران|الطائف|تبوك|أبها|خميس مشيط|جازان|نجران|حائل|بريدة|عنيزة|القصيم|الأحساء|الجبيل|ينبع|الخرج|الباحة|عرعر|سكاكا/i;
+  /السعودية|السعودي|المملكة|الرياض|جدة|مكة|المدينة|الدمام|الخبر|الظهران|الطائف|تبوك|أبها|خميس مشيط|جازان|نجران|حائل|بريدة|عنيزة|القصيم|الأحساء|الجبيل|ينبع|الخرج|الباحة|عرعر|سكاكا/i;
 
 const EXCLUDE =
-  /وزير|تصريحات|استثمارات|مميزات وعيوب|كيف|لماذا|تحليل|رأي|الحرب|إسرائيل|الإسرائيلي|ترامب|اتفاقية|توقعات|تقرير|رواتب الموظفين|نتائج القبول|انتهاء التقديم|إغلاق باب التقديم|الأزهر|مصر|القاهرة|العراق|الأردن|الكويت|الإمارات|قطر|البحرين|سلطنة عمان|المغرب|الجزائر|تونس|السودان|سوريا|لبنان|باكستان|الهند/i;
+  /ترامب|إسرائيل|الحرب|سياسة|انتخابات|تحليل|رأي|توقعات|الأزهر|القاهرة|العراق|الأردن|الكويت|الإمارات|قطر|البحرين|المغرب|الجزائر|تونس|السودان|باكستان|الهند|نتائج القبول|إغلاق باب التقديم|انتهاء التقديم|رواتب الموظفين|مميزات وعيوب|كيف تحصل|نصائح|احتيال|وهمية/i;
+
+const CITIES = [
+  "الرياض", "جدة", "مكة", "المدينة",
+  "الدمام", "الخبر", "الظهران",
+  "الطائف", "تبوك", "أبها",
+  "خميس مشيط", "جازان", "نجران",
+  "حائل", "بريدة", "عنيزة",
+  "القصيم", "الأحساء", "الجبيل",
+  "ينبع", "الخرج", "الباحة",
+  "عرعر", "سكاكا"
+];
+
+const GOVERNMENT =
+  /وزارة|هيئة|جامعة حكومية|أمانة|بلدية|مستشفى حكومي|الدفاع المدني|الحرس الوطني|المديرية العامة|القطاع الحكومي|وظائف حكومية/i;
 
 function decode(text = "") {
-  return text
+  return String(text)
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
     .replace(/&amp;/g, "&")
     .replace(/&quot;/g, '"')
@@ -33,12 +51,43 @@ function decode(text = "") {
 function tag(xml, name) {
   const match = xml.match(
     new RegExp(
-      `<${name}[^>]*>([\\s\\S]*?)<\\/${name}>`,
+      `<${name}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${name}>`,
       "i"
     )
   );
 
   return match ? decode(match[1]).trim() : "";
+}
+
+function clean(text = "") {
+  return String(text)
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getCity(text) {
+  return CITIES.find(city => text.includes(city)) || "";
+}
+
+function getSector(text) {
+  if (GOVERNMENT.test(text)) return "حكومي";
+  if (/شركة|شركات|قطاع خاص|مؤسسة خاصة/i.test(text)) {
+    return "خاص";
+  }
+  return "غير محدد";
+}
+
+function validUrl(value) {
+  try {
+    const url = new URL(value);
+
+    return url.protocol === "https:" &&
+      !url.username &&
+      !url.password;
+  } catch {
+    return false;
+  }
 }
 
 async function getNews(query) {
@@ -49,25 +98,26 @@ async function getNews(query) {
 
   const response = await fetch(url, {
     headers: {
-      "User-Agent": "SaudiJobsBot/1.0"
+      "User-Agent": "SaudiJobsBot/2.0"
     },
     signal: AbortSignal.timeout(20000)
   });
 
   if (!response.ok) {
     throw new Error(
-      `News feed HTTP ${response.status}`
+      `Google News HTTP ${response.status}`
     );
   }
 
   const xml = await response.text();
 
   const items =
-    xml.match(/<item>[\s\S]*?<\/item>/g) || [];
+    xml.match(/<item>[\s\S]*?<\/item>/gi) || [];
 
   return items.map(item => ({
-    title: tag(item, "title"),
-    source: tag(item, "source"),
+    title: clean(tag(item, "title")),
+    source: clean(tag(item, "source")),
+    description: clean(tag(item, "description")),
     url: tag(item, "link"),
     published: tag(item, "pubDate")
   }));
@@ -85,7 +135,7 @@ async function main() {
       successfulSources++;
 
       console.log(
-        `Fetched ${results.length} results`
+        `Fetched ${results.length} items`
       );
     } catch (error) {
       console.error(
@@ -104,24 +154,22 @@ async function main() {
 
   for (const item of all) {
     const title = item.title || "";
+    const text = title + " " + item.description;
 
     if (!JOB_WORDS.test(title)) continue;
-    if (!SAUDI_WORDS.test(title)) continue;
+    if (!ACTION_WORDS.test(text)) continue;
+    if (!SAUDI_WORDS.test(text)) continue;
     if (EXCLUDE.test(title)) continue;
-
-    if (
-      !item.url ||
-      !item.url.startsWith("https://")
-    ) continue;
+    if (!validUrl(item.url)) continue;
 
     const date = Date.parse(item.published);
 
     if (!Number.isFinite(date)) continue;
+    if (date > now) continue;
+    if (now - date > 7 * 86400000) continue;
 
-    if (
-      date > now ||
-      now - date > 7 * 86400000
-    ) continue;
+    const city = getCity(text);
+    const sector = getSector(text);
 
     const key = title
       .toLowerCase()
@@ -135,15 +183,31 @@ async function main() {
       company:
         "المصدر: " +
         (item.source || "Google News"),
+      city,
+      sector,
+      type: sector,
       url: item.url,
       published: item.published,
-      type:
-        "خبر توظيف - تحقق من الشروط والرابط"
+      linkType: "news",
+      verified: false
     });
   }
 
   const jobs = [...unique.values()]
-    .slice(0, 15);
+    .sort((a, b) =>
+      Date.parse(b.published) -
+      Date.parse(a.published)
+    )
+    .slice(0, 30);
+
+  // Avoid overwriting existing jobs if
+  // no matching results were found.
+  if (jobs.length === 0) {
+    console.log(
+      "No matching jobs. Existing file preserved."
+    );
+    return;
+  }
 
   fs.writeFileSync(
     "jobs-data.json",
@@ -151,7 +215,7 @@ async function main() {
   );
 
   console.log(
-    `Saved ${jobs.length} Saudi job news items`
+    `Saved ${jobs.length} Saudi job announcements`
   );
 }
 
