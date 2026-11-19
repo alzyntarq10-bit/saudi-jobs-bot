@@ -1,6 +1,6 @@
 
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar" dir="rtl">https://github.com/alzyntarq10-bit/saudi-jobs-bot/edit/main/miniapp/index.html
 <head>
  <script src="//libtl.com/sdk.js" data-zone="12299617" data-sdk="show_12299617"></script>
 <meta charset="UTF-8">
@@ -77,13 +77,36 @@ function render(){
   }
   const url=safeUrl(j.url);
   if(url){
-   const a=document.createElement("a");
-   a.className="apply";
-   a.textContent="عرض الوظيفة والتقديم";
-   a.href=url;
-   a.target="_blank";
-   a.rel="noopener noreferrer";
-   card.append(a);
+   
+const a = document.createElement("a");
+a.className = "apply";
+a.textContent = "عرض الوظيفة والتقديم";
+a.href = url;
+a.target = "_blank";
+a.rel = "noopener noreferrer";
+
+a.addEventListener("click", async (event) => {
+  if (typeof window.show_12299617 !== "function") {
+    return;
+  }
+
+  event.preventDefault();
+
+  const openJob = () => {
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  try {
+    await window.show_12299617();
+  } catch (error) {
+    console.warn("Monetag ad unavailable", error);
+  }
+
+  openJob();
+});
+
+card.append(a);
+
   }
   box.append(card);
  });
