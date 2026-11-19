@@ -103,6 +103,38 @@ async function load(){
 ["search","city"].forEach(id=>document.getElementById(id).addEventListener("input",render));
 document.getElementById("sector").addEventListener("change",render);
 load();
+ 
+async function showJobAd() {
+  const button = document.getElementById("watchAd");
+
+  if (typeof window.show_12299617 !== "function") {
+    alert("الإعلان غير متاح حاليًا");
+    return;
+  }
+
+  button.disabled = true;
+
+  try {
+    await window.show_12299617();
+  } catch (error) {
+    console.error("Monetag ad error:", error);
+    alert("تعذر عرض الإعلان، حاول لاحقًا");
+  } finally {
+    button.disabled = false;
+  }
+}
+
+const adButton = document.createElement("button");
+adButton.id = "watchAd";
+adButton.textContent = "🎬 مشاهدة إعلان";
+adButton.style.cssText =
+  "display:block;margin:20px auto;padding:14px 25px;" +
+  "background:#08784e;color:white;border:0;" +
+  "border-radius:12px;font-size:17px;cursor:pointer";
+
+adButton.addEventListener("click", showJobAd);
+document.querySelector("main").appendChild(adButton);
+
 </script>
 </body>
 </html>
