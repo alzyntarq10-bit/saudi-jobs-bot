@@ -1,6 +1,17 @@
 {
   "jobs": [
     {
+      "title": "منصة «جدارات» تعلن عن 1148 وظيفة للسعوديين موزعة على 13 منطقة إدارية - صحيفة جدة 24",
+      "company": "المصدر: صحيفة جدة 24",
+      "city": "جدة",
+      "sector": "غير محدد",
+      "type": "غير محدد",
+      "url": "https://news.google.com/rss/articles/CBMiUEFVX3lxTE9DejZyTXJ0eXd6eml0cTU3eWNtdTgyR2xzZFNyRkxXU2R6NTVuNVRyLXZYbGdPeFJWcWtEVFVzVEJPdEJqRkZyMDJfRVFCRXZR?oc=5",
+      "published": "Fri, 20 Nov 2026 22:17:07 GMT",
+      "linkType": "news",
+      "verified": false
+    },
+    {
       "title": "بوابة الوظائف الحكومية تقدم خطوات التقديم والاستعلام عن نتائج المسابقات - الاستاد الرياضي",
       "company": "المصدر: الاستاد الرياضي",
       "city": "الرياض",
@@ -63,17 +74,6 @@
       "type": "غير محدد",
       "url": "https://news.google.com/rss/articles/CBMiTkFVX3lxTE93SDJXYTRxUWFhWXVuYjczWk5VN1BWUW43VWdLdExSekoyblo1anBOcjN1N01pOTV4WkRZMEdwcXZTTFdNTmRNSkpmY2d2Zw?oc=5",
       "published": "Sat, 14 Nov 2026 11:16:24 GMT",
-      "linkType": "news",
-      "verified": false
-    },
-    {
-      "title": "\"شركة هيوماين\" تعلن وظائف خالية لحملة البكالوريوس فأعلى..(بادر بالتقديم) - السعودي اليوم",
-      "company": "المصدر: السعودي اليوم",
-      "city": "",
-      "sector": "خاص",
-      "type": "خاص",
-      "url": "https://news.google.com/rss/articles/CBMiTkFVX3lxTE9kNGtEeUtkcXBVNVVBd0poS3pKZWx5b3M1ZmVLd3l5Z3JIakdUQ0pZd3ItdThhWmpqMEkzV0Z4ckFIWVY4UVZIVlVHaTZEZw?oc=5",
-      "published": "Fri, 13 Nov 2026 22:06:21 GMT",
       "linkType": "news",
       "verified": false
     }
